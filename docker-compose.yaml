@@ -103,13 +103,13 @@ services:
   metricbeat:
     user: root
     container_name: metricbeat
-    image: docker.elastic.co/beats/metric:8.12.1
+    image: docker.elastic.co/beats/metricbeat:8.12.1
     depends_on:
       - logstash
     volumes:
       - ./metricbeat/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
       - /var/run/docker.sock:/var/run/docker.sock
-      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
       - /proc:/hostfs/proc:ro
       - /:/hostfs:ro
     environment:

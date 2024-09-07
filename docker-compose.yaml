@@ -1,125 +1,125 @@
-# version: "3"
-services:
-  setup:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
-    environment:
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - KIBANA_PASSWORD=${KIBANA_PASSWORD}
-    container_name: setup
-    command:
-      - bash
-      - -c
-      - |
-        echo "Waiting for Elasticsearch availability";
-        until curl -s http://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
-        echo "Setting kibana_system password";
-        until curl -s -X POST -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" http://elasticsearch:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
-        echo "All done!";
+    # version: "3"
+    services:
+      setup:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.15.1
+        environment:
+          - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+          - KIBANA_PASSWORD=${KIBANA_PASSWORD}
+        container_name: setup
+        command:
+          - bash
+          - -c
+          - |
+            echo "Waiting for Elasticsearch availability";
+            until curl -s http://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
+            echo "Setting kibana_system password";
+            until curl -s -X POST -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" http://elasticsearch:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
+            echo "All done!";
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
-    # give the container a name
-    # this will also set the container's hostname as elasticsearch
-    container_name: elasticsearch
-    environment:
-      - discovery.type=single-node
-      - cluster.name=elasticsearch
-      - bootstrap.memory_lock=true
-      # limits elasticsearch to 1 GB of RAM
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
-      # The password for the 'elastic' user
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - xpack.security.http.ssl.enabled=false
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.15.1
+        # give the container a name
+        # this will also set the container's hostname as elasticsearch
+        container_name: elasticsearch
+        environment:
+          - discovery.type=single-node
+          - cluster.name=elasticsearch
+          - bootstrap.memory_lock=true
+          # limits elasticsearch to 1 GB of RAM
+          - ES_JAVA_OPTS=-Xms1g -Xmx1g
+          # The password for the 'elastic' user
+          - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+          - xpack.security.http.ssl.enabled=false
+        ports:
+          - 9200:9200
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.12.1
-    container_name: kibana
-    ports:
-      - 5601:5601
-    environment:
-      # remember the container_name for elasticsearch?
-      # we use it here to access that container
-      - ELASTICSEARCH_HOSTS=${ELASTIC_HOSTS}
-      - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
-      # Change this to true if you want to sent
-      # telemetry data to kibana developers
-      - TELEMETRY_ENABLED=false
+      kibana:
+        image: docker.elastic.co/kibana/kibana:8.15.1
+        container_name: kibana
+        ports:
+          - 5601:5601
+        environment:
+          # remember the container_name for elasticsearch?
+          # we use it here to access that container
+          - ELASTICSEARCH_HOSTS=${ELASTIC_HOSTS}
+          - ELASTICSEARCH_USERNAME=kibana_system
+          - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+          # Change this to true if you want to sent
+          # telemetry data to kibana developers
+          - TELEMETRY_ENABLED=false
 
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.12.1
-    container_name: logstash
-    command:
-      - /bin/bash
-      - -c
-      - |
-        cp /usr/share/logstash/pipeline/logstash.yml /usr/share/logstash/config/logstash.yml
-        echo "Waiting for Elasticsearch availability";
-        until curl -s http://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 1; done;
-        echo "Starting logstash";
-        /usr/share/logstash/bin/logstash -f /usr/share/logstash/pipeline/logstash.conf
-    environment:
-      - xpack.monitoring.enabled=false #harusnya sih ini kalo semisalnya nyalain metricbeat, ini set ke true
-      - ELASTIC_USER=${ELASTIC_USERNAME}
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - ELASTIC_HOSTS=${ELASTIC_HOSTS}
-    volumes:
-      - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-      - ./logstash/pipeline/logstash-syslog.conf:/usr/share/logstash/pipeline/logstash-syslog.conf
-      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
-      - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml
+      logstash:
+        image: docker.elastic.co/logstash/logstash:8.15.1
+        container_name: logstash
+        command:
+          - /bin/bash
+          - -c
+          - |
+            cp /usr/share/logstash/pipeline/logstash.yml /usr/share/logstash/config/logstash.yml
+            echo "Waiting for Elasticsearch availability";
+            until curl -s http://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 1; done;
+            echo "Starting logstash";
+            /usr/share/logstash/bin/logstash -f /usr/share/logstash/pipeline/logstash.conf
+        environment:
+          - xpack.monitoring.enabled=true #harusnya sih ini kalo semisalnya nyalain metricbeat, ini set ke true
+          - ELASTIC_USER=${ELASTIC_USERNAME}
+          - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+          - ELASTIC_HOSTS=${ELASTIC_HOSTS}
+        volumes:
+          - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+          - ./logstash/pipeline/logstash-syslog.conf:/usr/share/logstash/pipeline/logstash-syslog.conf
+          - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+          - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml
 
-#using filebeat agent for logging system
-  filebeat:
-    user: root
-    container_name: filebeat
-    image: docker.elastic.co/beats/filebeat:8.12.1
-    depends_on:
-      - logstash
-    volumes:
-      - /var/run/docker.sock:/host_docker/docker.sock
-      - /var/lib/docker:/host_docker/var/lib/docker
-      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
-      - ./filebeat/mylog:/usr/share/filebeat/mylog
-      - /var/log:/usr/share/filebeat/mylog/
-    command: ["--strict.perms=false"]
-    ports:
-      - 5044:5044
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    stdin_open: true
-    tty: true
-    deploy:
-      mode: global
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "50"
+    #using filebeat agent for logging system
+      filebeat:
+        user: root
+        container_name: filebeat
+        image: docker.elastic.co/beats/filebeat:8.15.1
+        depends_on:
+          - logstash
+        volumes:
+          - /var/run/docker.sock:/host_docker/docker.sock
+          - /var/lib/docker:/host_docker/var/lib/docker
+          - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+          - ./filebeat/mylog:/usr/share/filebeat/mylog
+          - /var/log:/usr/share/filebeat/mylog/
+        command: ["--strict.perms=false"]
+        ports:
+          - 5044:5044
+        ulimits:
+          memlock:
+            soft: -1
+            hard: -1
+        stdin_open: true
+        tty: true
+        deploy:
+          mode: global
+        logging:
+          driver: "json-file"
+          options:
+            max-size: "10m"
+            max-file: "50"
 
-#using metricbeat agent for monitoring system
-  metricbeat:
-    user: root
-    container_name: metricbeat
-    image: docker.elastic.co/beats/metricbeat:8.12.1
-    depends_on:
-      - logstash
-    volumes:
-      - ./metricbeat/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
-      - /proc:/hostfs/proc:ro
-      - /:/hostfs:ro
-    environment:
-      - ELASTIC_USER=${ELASTIC_USERNAME}
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
-      - ELASTIC_HOSTS=${ELASTIC_HOSTS}
-    # disable strict permission checks
-    command: ["--strict.perms=false", "-system.hostfs=/hostfs"]
-    ports:
-      - 5066:5066     
-    deploy:
-      mode: global
-    
+    #using metricbeat agent for monitoring system
+      metricbeat:
+        user: root
+        container_name: metricbeat
+        image: docker.elastic.co/beats/metricbeat:8.15.1
+        depends_on:
+          - elasticsearch 
+        volumes:
+          - ./metricbeat/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
+          - /var/run/docker.sock:/var/run/docker.sock
+          - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro     
+          - /proc:/hostfs/proc:ro
+          - /:/hostfs:ro
+        environment:
+          - ELASTIC_USER=${ELASTIC_USERNAME}
+          - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+          - ELASTIC_HOSTS=${ELASTIC_HOSTS}
+          - KIBANA_HOSTS=${KIBANA_HOSTS}
+          - LOGSTASH_HOSTS=${LOGSTASH_HOSTS}
+        # disable strict permission checks
+        command: ["--strict.perms=false", "-system.hostfs=/hostfs"]
+        

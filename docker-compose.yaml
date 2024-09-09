@@ -67,7 +67,6 @@
           - ELASTIC_HOSTS=${ELASTIC_HOSTS}
         volumes:
           - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-          - ./logstash/pipeline/logstash-syslog.conf:/usr/share/logstash/pipeline/logstash-syslog.conf
           - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
           - ./logstash/config/pipelines.yml:/usr/share/logstash/config/pipelines.yml
 
